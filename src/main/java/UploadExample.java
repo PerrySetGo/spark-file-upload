@@ -17,32 +17,30 @@ public class UploadExample {
         staticFiles.externalLocation("upload");
 
         get("/", (req, res) ->
+        //could be replaced by template
                   "<form method='post' enctype='multipart/form-data'>" // note the enctype
-                + "    <input type='file' name='uploaded_file' accept='.png'>" // make sure to call getPart using the same "name" in the post
+                + "    <input type='file' name='uploaded_file' accept='image/*'>" // make sure to call getPart using the same "name" in the post
                 + "    <button>Upload picture</button>"
                 + "</form>"
         );
 
         post("/", (req, res) -> {
-
-            Path tempFile = Files.createTempFile(uploadDir.toPath(), "", "");
-
+            String originalFileName;
+            Path newPath;
             req.attribute("org.eclipse.jetty.multipartConfig", new MultipartConfigElement("/temp"));
-
             try (InputStream input = req.raw().getPart("uploaded_file").getInputStream()) { // getPart needs to use same "name" as input field in form
-                Files.copy(input, tempFile, StandardCopyOption.REPLACE_EXISTING);
+
+              originalFileName = getFileName(req.raw().getPart("uploaded_file"));
+              Path tempFile = Files.createTempFile(uploadDir.toPath(),originalFileName, "");
+              System.out.println(tempFile.toString());
+              newPath = Paths.get(uploadDir.toString(), originalFileName); //make a new path object to pass
+
+              Files.copy(input, tempFile, StandardCopyOption.REPLACE_EXISTING);
+              Files.move(tempFile, newPath, StandardCopyOption.REPLACE_EXISTING);
             }
-
-            logInfo(req, tempFile);
-            return "<h1>You uploaded this image:<h1><img src='" + tempFile.getFileName() + "'>";
-
+            return "<h1>You uploaded this image:<h1><img src='" + newPath.getFileName() + "'>"; //or send to template
         });
 
-    }
-
-    // methods used for logging
-    private static void logInfo(Request req, Path tempFile) throws IOException, ServletException {
-        System.out.println("Uploaded file '" + getFileName(req.raw().getPart("uploaded_file")) + "' saved as '" + tempFile.toAbsolutePath() + "'");
     }
 
     private static String getFileName(Part part) {
@@ -53,7 +51,4 @@ public class UploadExample {
         }
         return null;
     }
-
 }
-
-
